@@ -22,12 +22,9 @@ I created this out of a need for a portable way to monitor a remote SFTP server 
 
 ## Configuration Instructions
 
-Create a `.env` file and populate it with your own settings:
+Create a `.env` file and edit it with your own settings:
 
-<details>
-<summary><code>.env</code> Template</summary>
-
-```.env
+```env
 # SFTP configuration
 SFTP_HOST=sftp.example.com
 SFTP_PORT=22
