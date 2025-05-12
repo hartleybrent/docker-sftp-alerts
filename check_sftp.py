@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Brent Hartley
+# GNU Public License V3
+
 import paramiko
 import datetime
 import smtplib
