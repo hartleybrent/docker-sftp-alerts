@@ -9,8 +9,10 @@ Files Included:
 - `entrypoint.sh` – Sets up cron dynamically using values from `.env`
 - `check_sftp.py` – Python script to check for old files and send email
 - `requirements.txt` – Load ython dependencies
-- `.env` – Environment variables for config
 - `README.md`
+
+File Not Included:
+- .env. Create this file yourself based on the template below.
 
 ==================
 
