@@ -1,69 +1,91 @@
-#!/usr/bin/env python3
-
-# Brent Hartley
-# GNU Public License V3
-
-import paramiko
-import datetime
-import smtplib
-import stat
 import os
+import time
+import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import paramiko
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
-def check_sftp_files():
-    hostname = os.getenv('SFTP_HOST')
-    username = os.getenv('SFTP_USER')
-    password = os.getenv('SFTP_PASS')
-    port = int(os.getenv('SFTP_PORT', 22))
-    folder_path = os.getenv('SFTP_FOLDER')
+# SFTP configuration
+SFTP_HOST = os.getenv("SFTP_HOST")
+SFTP_PORT = int(os.getenv("SFTP_PORT", 22))
+SFTP_USER = os.getenv("SFTP_USER")
+SFTP_PASS = os.getenv("SFTP_PASS")
+SFTP_FOLDER = os.getenv("SFTP_FOLDER")
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, port=port, username=username, password=password)
-    sftp = ssh.open_sftp()
+# Email configuration
+SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+SENDER_EMAIL_PASSWORD = os.getenv("SENDER_EMAIL_PASSWORD")
+RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 
-    now = datetime.datetime.now()
-    old_files = []
+# File alert configuration
+ALERT_AGE_HOURS = int(os.getenv("ALERT_AGE_HOURS", 6))
 
-    try:
-        for file_attr in sftp.listdir_attr(folder_path):
-            if not stat.S_ISDIR(file_attr.st_mode):
-                file_path = f"{folder_path}/{file_attr.filename}"
-                file_time = datetime.datetime.fromtimestamp(file_attr.st_mtime)
-                alert_age = int(os.getenv('ALERT_AGE_HOURS', 6))
-                if (now - file_time).total_seconds() > alert_age * 3600:
-                    old_files.append(file_path)
-    except IOError as e:
-        print(f"Error: Unable to access the folder {folder_path}. {str(e)}")
+# File to store alerted files
+ALERTED_FILE_PATH = '/app/alerted_files.txt'
 
-    sftp.close()
-    ssh.close()
+def get_older_files(sftp_client):
+    """ Get files older than the configured ALERT_AGE_HOURS. """
+    older_files = []
+    current_time = time.time()
 
-    return old_files
+    # List files in the SFTP folder
+    for filename in sftp_client.listdir_attr(SFTP_FOLDER):
+        file_path = os.path.join(SFTP_FOLDER, filename.filename)
+        file_time = sftp_client.stat(file_path).st_mtime
+        file_age_hours = (current_time - file_time) / 3600
 
-def send_email_alert(old_files):
-    smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port = int(os.getenv('SMTP_PORT', 587))
-    sender_email = os.getenv('SENDER_EMAIL')
-    sender_password = os.getenv('SENDER_EMAIL_PASSWORD')
-    receiver_email = os.getenv('RECEIVER_EMAIL')
+        if file_age_hours > ALERT_AGE_HOURS:
+            older_files.append(filename.filename)
 
-    subject = "SFTP File Alert"
-    body = "The following files are older than the allowed threshold:\n\n" + "\n".join(old_files)
-    msg = MIMEText(body)
+    return older_files
+
+def send_email(subject, body):
+    """ Send an email notification. """
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = RECEIVER_EMAIL
     msg['Subject'] = subject
-    msg['From'] = sender_email
-    msg['To'] = receiver_email
+    msg.attach(MIMEText(body, 'plain'))
 
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
+        server.login(SENDER_EMAIL, SENDER_EMAIL_PASSWORD)
+        server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+
+def check_sftp():
+    """ Check SFTP folder for old files and send alerts. """
+    # Connect to SFTP server
+    transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+    transport.connect(username=SFTP_USER, password=SFTP_PASS)
+    sftp_client = paramiko.SFTPClient.from_transport(transport)
+
+    older_files = get_older_files(sftp_client)
+
+    # Read previously alerted files to avoid duplicate alerts
+    alerted_files = set()
+    if os.path.exists(ALERTED_FILE_PATH):
+        with open(ALERTED_FILE_PATH, 'r') as f:
+            alerted_files = set(f.read().splitlines())
+
+    new_alerts = [f for f in older_files if f not in alerted_files]
+
+    if new_alerts:
+        # Send an email for new alerts
+        subject = "SFTP Alert: Files older than threshold"
+        body = f"The following files are older than {ALERT_AGE_HOURS} hours:\n" + "\n".join(new_alerts)
+        send_email(subject, body)
+
+        # Log the newly alerted files
+        with open(ALERTED_FILE_PATH, 'a') as f:
+            f.write("\n".join(new_alerts) + "\n")
+
+    transport.close()
 
 if __name__ == "__main__":
-    old_files = check_sftp_files()
-    if old_files:
-        send_email_alert(old_files)
+    check_sftp()
