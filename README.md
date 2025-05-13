@@ -44,3 +44,18 @@ ALERT_AGE_HOURS=6
 
 # Cron schedule (default: every 30 minutes)
 CRON_SCHEDULE=*/30 * * * *
+```
+## Build Instructions
+
+You can use the docker-compose yaml file to build using docker compose, or you can build with the following commands
+
+```
+docker build -t sftp-monitor .
+mkdir -p ./logs
+docker run -d \
+  --name sftp-checker \
+  --env-file .env \
+  -v ./logs:/var/log \
+  -v ./alerted_files.txt:/app/alerted_files.txt \
+  sftp-monitor
+
