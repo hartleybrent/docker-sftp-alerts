@@ -1,0 +1,11 @@
+services:
+  sftp-checker:
+    build:
+      context: .
+    container_name: sftp-checker
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/var/log
+      - ./alerted_files.txt:/app/alerted_files.txt
+    restart: unless-stopped
