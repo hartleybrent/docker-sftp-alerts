@@ -2,10 +2,11 @@ services:
   sftp-checker:
     build:
       context: .
+      dockerfile: Dockerfile
     container_name: sftp-checker
     env_file:
       - .env
     volumes:
-      - ./logs:/var/log
-      - ./alerted_files.txt:/app/alerted_files.txt
+      - ./logs:/logs
+      - ./alerted-files:/alerted-files
     restart: unless-stopped
