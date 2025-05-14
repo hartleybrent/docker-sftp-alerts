@@ -1,17 +1,19 @@
-FROM python:3.11-slim
+#!/bin/sh
 
-# Install cron
-RUN apt-get update && apt-get install -y cron && ln -s /usr/bin/python3 /usr/bin/python
+# Load environment variables for cron (optional, helpful for debugging)
+printenv | grep -v "no_proxy" >> /etc/environment
 
-# Set working directory
-WORKDIR /app
+# Dynamically find the path to Python
+PYTHON_PATH=$(which python3)
 
-# Copy and install dependencies
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Create the cron job with the full path to Python
+echo "$CRON_SCHEDULE root $PYTHON_PATH /app/check_sftp.py >> /var/log/cron.log 2>&1" > /etc/cron.d/sftp-check
 
-# Copy scripts
-COPY check_sftp.py entrypoint.sh ./
-RUN chmod +x entrypoint.sh check_sftp.py
+# Set the correct permissions so cron will run it
+chmod 0644 /etc/cron.d/sftp-check
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Install the cron job
+crontab /etc/cron.d/sftp-check
+
+# Start cron in the foreground
+cron -f
