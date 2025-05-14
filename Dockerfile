@@ -1,16 +1,17 @@
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y cron && apt-get clean
+# Install cron
+RUN apt-get update && apt-get install -y cron && ln -s /usr/bin/python3 /usr/bin/python
 
+# Set working directory
 WORKDIR /app
 
-COPY requirements.txt .
+# Copy and install dependencies
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY check_sftp.py .
-COPY .env .
-COPY entrypoint.sh .
+# Copy scripts
+COPY check_sftp.py entrypoint.sh ./
+RUN chmod +x entrypoint.sh check_sftp.py
 
-RUN chmod +x entrypoint.sh
-
-CMD ["./entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
