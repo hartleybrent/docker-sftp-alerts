@@ -1,16 +1,17 @@
-#!/bin/sh
+FROM python:3.11-slim
 
-# Load .env manually for use in this script
-export $(grep -v '^#' .env | xargs)
+# Install cron
+RUN apt-get update && apt-get install -y cron && ln -s /usr/bin/python3 /usr/bin/python
 
-# Default to every hour if not set
-CRON_SCHEDULE="${CRON_SCHEDULE:-0 * * * *}"
+# Set working directory
+WORKDIR /app
 
-echo "Using schedule: '$CRON_SCHEDULE'"
+# Copy and install dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Write dynamic crontab
-echo "$CRON_SCHEDULE cd /app && /usr/local/bin/python /app/check_sftp.py >> /var/log/cron.log 2>&1" > /tmp/cronjob
-crontab /tmp/cronjob
+# Copy scripts
+COPY check_sftp.py entrypoint.sh ./
+RUN chmod +x entrypoint.sh check_sftp.py
 
-# Start cron in foreground
-cron -f
+ENTRYPOINT ["/app/entrypoint.sh"]
