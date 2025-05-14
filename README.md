@@ -24,8 +24,6 @@ I created this out of a need for a portable way to monitor a remote SFTP server 
 
 Create a `.env` file and edit it with your own settings (below).
 Create a 'logs' folder and an 'alerted files' folder in the directory that your docker compose file lives in.
-mkdir logs
-mkdir alerted-files
 
 ```env
 # SFTP configuration
